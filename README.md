@@ -1,4 +1,4 @@
-# md-semlinebreak
+# mdfix
 
 A Markdown semantic line break reformatter that improves readability by breaking lines at semantically meaningful points.
 
@@ -13,8 +13,10 @@ A Markdown semantic line break reformatter that improves readability by breaking
 
 ## Installation
 
+Clone repo or download zip, then:
+
 ```bash
-pip install md-semlinebreak
+pip install -e .
 ```
 
 ## Usage
@@ -23,19 +25,19 @@ pip install md-semlinebreak
 
 ```bash
 # Format a file and output to stdout
-md-semlinebreak input.md
+mdfix input.md
 
 # Format a file and save to another file
-md-semlinebreak input.md -o output.md
+mdfix input.md -o output.md
 
 # Format a file in place
-md-semlinebreak -i input.md
+mdfix -i input.md
 
 # Normalize Unicode characters (smart quotes, em dashes, etc.)
-md-semlinebreak --normalize input.md
+mdfix --normalize input.md
 
 # Read from stdin
-echo "This is a long sentence, with multiple clauses, and it should be reformatted." | md-semlinebreak
+echo "This is a long sentence, with multiple clauses, and it should be reformatted." | mdfix
 ```
 
 ### Python API

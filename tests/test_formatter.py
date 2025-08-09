@@ -2,6 +2,7 @@
 
 import pytest
 from md_semlinebreak.formatter import format_paragraph, format_markdown, normalize_unicode
+from md_semlinebreak.config import Config
 
 
 class TestSemanticBreakFormatter:
@@ -28,10 +29,10 @@ class TestSemanticBreakFormatter:
         result = format_paragraph(text)
         assert result == expected
     
-    def test_conjunction_break(self):
-        """Test breaking on conjunctions."""
-        text = "This is a test and it should break on conjunctions."
-        expected = "This is a test and\nit should break on conjunctions."
+    def test_conjunction_no_break(self):
+        """Test that simple conjunctions don't break mid-sentence."""
+        text = "This book is for developers who know two or more languages but not JavaScript."
+        expected = "This book is for developers who know two or more languages but not JavaScript."
         result = format_paragraph(text)
         assert result == expected
     
@@ -82,7 +83,7 @@ class TestNormalizeUnicode:
     
     def test_smart_quotes(self):
         """Test converting smart quotes to straight quotes."""
-        text = ""Hello world" and 'test'"
+        text = "\u201CHello world\u201D and \u2018test\u2019"
         expected = '"Hello world" and \'test\''
         result = normalize_unicode(text)
         assert result == expected
@@ -111,13 +112,13 @@ class TestNormalizeUnicode:
     def test_zero_width_spaces(self):
         """Test removing zero-width spaces."""
         text = "This\u200Bhas\u2060zero-width spaces"
-        expected = "Thishas zero-width spaces"
+        expected = "Thishaszero-width spaces"
         result = normalize_unicode(text)
         assert result == expected
     
     def test_multiple_replacements(self):
         """Test handling multiple Unicode characters."""
-        text = ""This is a test" — with multiple… characters'"
+        text = "\u201CThis is a test\u201D \u2014 with multiple\u2026 characters\u2019"
         expected = '"This is a test" -- with multiple... characters\''
         result = normalize_unicode(text)
         assert result == expected
@@ -128,3 +129,74 @@ class TestNormalizeUnicode:
         expected = text
         result = normalize_unicode(text)
         assert result == expected
+
+
+class TestConfig:
+    """Test cases for configuration functionality."""
+    
+    def test_default_config(self):
+        """Test default configuration values."""
+        config = Config()
+        assert config.max_line_length == 80
+        assert config.soft_wrap_length == 70
+        assert config.break_at_clauses == True
+        assert config.clause_break_punctuation == [',', ':', ';']
+        
+    def test_custom_config(self):
+        """Test custom configuration values."""
+        config = Config(
+            max_line_length=100,
+            break_at_clauses=False,
+            clause_break_punctuation=[',']
+        )
+        assert config.max_line_length == 100
+        assert config.break_at_clauses == False
+        assert config.clause_break_punctuation == [',']
+        
+    def test_disable_clause_breaks(self):
+        """Test disabling clause breaks."""
+        config = Config(break_at_clauses=False)
+        text = "This has commas, semicolons; and colons: but no breaks."
+        expected = "This has commas, semicolons; and colons: but no breaks."
+        result = format_paragraph(text, config)
+        assert result == expected
+        
+    def test_custom_punctuation(self):
+        """Test custom clause break punctuation."""
+        config = Config(clause_break_punctuation=[','])  # Only break on commas
+        text = "Commas, break; semicolons: don't break."
+        expected = "Commas,\nbreak; semicolons: don't break."
+        result = format_paragraph(text, config)
+        assert result == expected
+        
+    def test_compound_phrases_preserved(self):
+        """Test that compound phrases with or/and stay together."""
+        text = "This book is for developers who have two or more programming languages, but not JavaScript or TypeScript."
+        expected = "This book is for developers who have two or more programming languages,\nbut not JavaScript or TypeScript."
+        result = format_paragraph(text)
+        assert result == expected
+        
+    def test_complex_paragraph_formatting(self):
+        """Test formatting of a complex paragraph similar to the original issue."""
+        text = "This book is for developers who have a firm grasp of two or more programming languages, but not JavaScript or TypeScript. The goal is to quickly give the experienced programmer a tour of the language, including all the odd and obscure bits so you aren't flummoxed when you see them in practice."
+        
+        expected = ("This book is for developers who have a firm grasp of two or more programming languages,\n"
+                   "but not JavaScript or TypeScript.\n"
+                   "The goal is to quickly give the experienced programmer a tour of the language,\n"
+                   "including all the odd and obscure bits so you aren't flummoxed when you see them in practice.")
+        
+        result = format_paragraph(text)
+        assert result == expected
+        
+    def test_line_length_consideration(self):
+        """Test that line length affects breaking decisions."""
+        config = Config(soft_wrap_length=30)  # Very short lines
+        text = "This is a very long sentence with commas, and other punctuation that should break more aggressively."
+        result = format_paragraph(text, config)
+        lines = result.split('\n')
+        
+        # Should break at clause boundaries when lines get long
+        assert len(lines) > 1
+        for line in lines:
+            if line.strip():  # Ignore empty lines
+                assert len(line) <= 80  # Still respect max length

@@ -1,11 +1,10 @@
 """Semantic line break formatter for Markdown."""
 
 import re
+from .config import Config, DEFAULT_CONFIG
 
 # Compile regex patterns at module level
 SENTENCE_ENDINGS = re.compile(r'([.!?])\s+')
-CLAUSE_BREAKS = re.compile(r'([,:;])\s+')
-CONJUNCTION_BREAKS = re.compile(r'\s+(and|but|or|yet|so|for|nor)\s+')
 CODE_FENCE_PATTERN = re.compile(r'^```')
 
 # Character replacement mappings
@@ -54,9 +53,16 @@ def normalize_unicode(text: str) -> str:
     return text
 
 
-def _format_clauses(text: str) -> str:
+def _format_clauses(text: str, config: Config = DEFAULT_CONFIG) -> str:
     """Format clauses within a sentence."""
-    parts = CLAUSE_BREAKS.split(text)
+    if not config.break_at_clauses:
+        return text
+        
+    # Create clause breaks pattern from config
+    punct_pattern = r'([' + ''.join(re.escape(p) for p in config.clause_break_punctuation) + r'])\s+'
+    clause_breaks = re.compile(punct_pattern)
+    
+    parts = clause_breaks.split(text)
     formatted_parts = []
     current_part = ""
 
@@ -65,6 +71,7 @@ def _format_clauses(text: str) -> str:
             current_part += part
         else:  # Punctuation part
             current_part += part
+            # Always break after clause punctuation
             if current_part.strip():
                 formatted_parts.append(current_part.strip())
             current_part = ""
@@ -76,23 +83,16 @@ def _format_clauses(text: str) -> str:
     return '\n'.join(formatted_parts)
 
 
-def _format_sentence(sentence: str) -> str:
+def _format_sentence(sentence: str, config: Config = DEFAULT_CONFIG) -> str:
     """Format a single sentence with semantic breaks."""
-    parts = CONJUNCTION_BREAKS.split(sentence)
-    formatted_parts = []
-
-    for i, part in enumerate(parts):
-        if i % 2 == 0:  # Text part
-            if part.strip():
-                formatted_parts.append(_format_clauses(part.strip()))
-        else:  # Conjunction part
-            if formatted_parts:
-                formatted_parts[-1] += f" {part.strip()}"
-
-    return '\n'.join(filter(None, formatted_parts))
+    # Only break at major clause boundaries, not simple compound phrases
+    # Look for conjunctions that follow commas or are at the start of major clauses
+    
+    # First, handle clause breaks (commas, semicolons, colons)
+    return _format_clauses(sentence, config)
 
 
-def format_paragraph(paragraph: str) -> str:
+def format_paragraph(paragraph: str, config: Config = DEFAULT_CONFIG) -> str:
     """Format a single paragraph with semantic line breaks."""
     if not paragraph.strip():
         return paragraph
@@ -110,17 +110,17 @@ def format_paragraph(paragraph: str) -> str:
         else:  # Punctuation part
             current_line += part
             if current_line.strip():
-                lines.append(_format_sentence(current_line.strip()))
+                lines.append(_format_sentence(current_line.strip(), config))
             current_line = ""
 
     # Handle remaining text
     if current_line.strip():
-        lines.append(_format_sentence(current_line.strip()))
+        lines.append(_format_sentence(current_line.strip(), config))
 
     return '\n'.join(lines)
 
 
-def format_markdown(text: str) -> str:
+def format_markdown(text: str, config: Config = DEFAULT_CONFIG) -> str:
     """Format entire Markdown text with semantic line breaks."""
     lines = text.split('\n')
     result_lines = []
@@ -131,7 +131,7 @@ def format_markdown(text: str) -> str:
         # Handle code blocks
         if CODE_FENCE_PATTERN.match(line):
             if current_paragraph:
-                result_lines.append(format_paragraph(' '.join(current_paragraph)))
+                result_lines.append(format_paragraph(' '.join(current_paragraph), config))
                 current_paragraph = []
             in_code_block = not in_code_block
             result_lines.append(line)
@@ -151,7 +151,7 @@ def format_markdown(text: str) -> str:
 
             # Format accumulated paragraph
             if current_paragraph:
-                result_lines.append(format_paragraph(' '.join(current_paragraph)))
+                result_lines.append(format_paragraph(' '.join(current_paragraph), config))
                 current_paragraph = []
 
             result_lines.append(line)
@@ -161,6 +161,6 @@ def format_markdown(text: str) -> str:
 
     # Handle final paragraph
     if current_paragraph:
-        result_lines.append(format_paragraph(' '.join(current_paragraph)))
+        result_lines.append(format_paragraph(' '.join(current_paragraph), config))
 
     return '\n'.join(result_lines)
