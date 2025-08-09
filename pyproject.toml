@@ -1,0 +1,13 @@
+[project]
+name = "md-semlinebreak"
+version = "0.1.0"
+description = "Markdown semantic line break reformatter"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Your Name" }]
+
+[project.scripts]
+md-semlinebreak = "md_semlinebreak.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
